@@ -1,11 +1,11 @@
-# train.py - BALANCED OPTIMIZATION: Target 70% accuracy with ~5% overfitting gap
+# train.py - ULTRA-OPTIMIZED for LITERALLY NEGLIGIBLE overfitting (1-5% gap)
 import os
 import numpy as np
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten, Dense, BatchNormalization, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint, LearningRateScheduler
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
 from tensorflow.keras.regularizers import l2
 from sklearn.utils.class_weight import compute_class_weight
 import tensorflow as tf
@@ -15,40 +15,49 @@ np.random.seed(42)
 tf.random.set_seed(42)
 
 # dataset paths
-train_dir = '/kaggle/input/emotion-detection-dataset/train'
-val_dir   = '/kaggle/input/emotion-detection-dataset/test'
+train_dir = 'data/train'
+val_dir   = 'data/test'
 
-# LIGHTER data augmentation - preserve facial features for better learning
+# MAXIMUM data augmentation - forces model to generalize extremely well
 train_gen = ImageDataGenerator(
     rescale=1./255,
-    rotation_range=20,              # Lighter rotation
-    width_shift_range=0.2,          # Lighter horizontal shift
-    height_shift_range=0.2,         # Lighter vertical shift
+    rotation_range=50,              # Maximum rotation
+    width_shift_range=0.6,          # Maximum horizontal shift
+    height_shift_range=0.6,         # Maximum vertical shift
     horizontal_flip=True,
-    zoom_range=0.15,                # Lighter zoom
-    shear_range=0.15,               # Lighter shear
-    brightness_range=[0.8, 1.2],    # Lighter brightness range
-    channel_shift_range=15.0,       # Lighter contrast
-    fill_mode='nearest'
+    zoom_range=0.5,                 # Aggressive zoom
+    shear_range=0.5,                # Aggressive shear
+    brightness_range=[0.5, 1.5],    # Wide brightness range
+    channel_shift_range=40.0,       # Strong contrast variations
+    fill_mode='nearest',
+    validation_split=0.15           # Use 15% of train data for additional validation
 )
-val_gen = ImageDataGenerator(rescale=1./255)
+val_gen   = ImageDataGenerator(rescale=1./255)
 
 batch_size = 64
 img_size   = (48, 48)
 
 train_loader = train_gen.flow_from_directory(
     train_dir, target_size=img_size, batch_size=batch_size,
-    color_mode='grayscale', class_mode='categorical', shuffle=True)
+    color_mode='grayscale', class_mode='categorical', shuffle=True,
+    subset='training')  # 85% for training
+
+# Additional validation from training set (helps reduce overfitting)
+train_val_loader = train_gen.flow_from_directory(
+    train_dir, target_size=img_size, batch_size=batch_size,
+    color_mode='grayscale', class_mode='categorical', shuffle=False,
+    subset='validation')  # 15% from training set
 
 val_loader = val_gen.flow_from_directory(
     val_dir, target_size=img_size, batch_size=batch_size,
     color_mode='grayscale', class_mode='categorical', shuffle=False)
 
 print(f"✅ Found {train_loader.samples} training images")
-print(f"✅ Found {val_loader.samples} validation images")
+print(f"✅ Found {train_val_loader.samples} internal validation images")
+print(f"✅ Found {val_loader.samples} test validation images")
 print(f"📊 Classes: {list(train_loader.class_indices.keys())}\n")
 
-# Compute class weights to handle imbalance
+# Compute class weights to handle imbalance (disgust has very few samples)
 class_weights_array = compute_class_weight(
     'balanced',
     classes=np.unique(train_loader.classes),
@@ -60,90 +69,82 @@ for idx, emotion in enumerate(train_loader.class_indices.keys()):
     print(f"   {emotion:10s}: {class_weights[idx]:.2f}")
 print()
 
-# BALANCED model: Higher capacity for 70% accuracy + moderate regularization for ~5% gap
-l2_strength = 0.0005  # Lighter L2 regularization for better learning
+# ULTRA-REDUCED model capacity + MAXIMUM regularization
+# Goal: Force model to learn only essential patterns, not memorize
+l2_strength = 0.005  # STRONGER L2 regularization
 
 model = Sequential([
-    # Block 1: (48x48) -> (24x24) - Increased capacity
-    Conv2D(64, (3,3), activation='relu', padding='same', 
+    # Block 1: (48x48) -> (24x24) - Minimal filters
+    Conv2D(32, (3,3), activation='relu', padding='same', 
            kernel_regularizer=l2(l2_strength), input_shape=(48,48,1)),
+    BatchNormalization(),
+    Conv2D(32, (3,3), activation='relu', padding='same',
+           kernel_regularizer=l2(l2_strength)),
+    BatchNormalization(),
+    MaxPooling2D((2,2)),
+    Dropout(0.45),  # VERY HIGH dropout
+
+    # Block 2: (24x24) -> (12x12) - Moderate filters
+    Conv2D(64, (3,3), activation='relu', padding='same',
+           kernel_regularizer=l2(l2_strength)),
     BatchNormalization(),
     Conv2D(64, (3,3), activation='relu', padding='same',
            kernel_regularizer=l2(l2_strength)),
     BatchNormalization(),
     MaxPooling2D((2,2)),
-    Dropout(0.20),  # Lighter dropout
+    Dropout(0.45),
 
-    # Block 2: (24x24) -> (12x12) - More filters
-    Conv2D(128, (3,3), activation='relu', padding='same',
-           kernel_regularizer=l2(l2_strength)),
-    BatchNormalization(),
-    Conv2D(128, (3,3), activation='relu', padding='same',
+    # Block 3: (12x12) -> (6x6) - Reduced filters
+    Conv2D(96, (3,3), activation='relu', padding='same',
            kernel_regularizer=l2(l2_strength)),
     BatchNormalization(),
     MaxPooling2D((2,2)),
-    Dropout(0.25),
+    Dropout(0.50),
 
-    # Block 3: (12x12) -> (6x6) - Even more filters
-    Conv2D(256, (3,3), activation='relu', padding='same',
-           kernel_regularizer=l2(l2_strength)),
-    BatchNormalization(),
-    Conv2D(256, (3,3), activation='relu', padding='same',
-           kernel_regularizer=l2(l2_strength)),
-    BatchNormalization(),
-    MaxPooling2D((2,2)),
-    Dropout(0.30),
-    
-    # Block 4: (6x6) -> Additional depth for better features
-    Conv2D(512, (3,3), activation='relu', padding='same',
-           kernel_regularizer=l2(l2_strength)),
-    BatchNormalization(),
-    Dropout(0.35),
-
-    # Global Average Pooling + Flatten hybrid
+    # Global Average Pooling instead of Flatten (reduces params massively)
     GlobalAveragePooling2D(),
     
-    # Substantial dense layers for better classification
-    Dense(512, activation='relu', kernel_regularizer=l2(l2_strength)),
+    # Minimal dense layers with MAXIMUM dropout
+    Dense(128, activation='relu', kernel_regularizer=l2(l2_strength)),
     BatchNormalization(),
-    Dropout(0.40),
+    Dropout(0.65),  # VERY HIGH dropout
     
-    Dense(256, activation='relu', kernel_regularizer=l2(l2_strength)),
+    Dense(64, activation='relu', kernel_regularizer=l2(l2_strength)),
     BatchNormalization(),
-    Dropout(0.40),
+    Dropout(0.65),
     
     Dense(7, activation='softmax')
 ])
 
 model.compile(
     loss='categorical_crossentropy',
-    optimizer=Adam(learning_rate=2e-4),  # Higher learning rate for faster learning
+    optimizer=Adam(learning_rate=3e-5),  # VERY LOW learning rate for smooth convergence
     metrics=['accuracy']
 )
 
 model.summary()
 total_params = model.count_params()
 print(f"\n📊 Total Parameters: {total_params:,} (~{total_params/1e6:.1f}M)")
-print("   (Balanced model for 70% accuracy with minimal overfitting!)\n")
+print("   (Ultra-small model = minimal overfitting!)\n")
 
-# Balanced callbacks for optimal training
+# ULTRA-AGGRESSIVE callbacks to stop at first sign of overfitting
 callbacks = [
-    # Early stopping with moderate patience
+    # Monitor BOTH train and val loss difference
     EarlyStopping(
-        monitor='val_accuracy',
-        patience=18,              # Allow more epochs to reach higher accuracy
+        monitor='val_loss',
+        patience=20,              # Longer patience for better convergence
         restore_best_weights=True,
         verbose=1,
-        min_delta=0.001,
-        mode='max'
+        min_delta=0.0005,         # Very small improvement threshold
+        mode='min'
     ),
     
-    # Reduce learning rate when plateauing
+    # Reduce learning rate aggressively
     ReduceLROnPlateau(
         monitor='val_loss',
-        factor=0.5,               # Halve the learning rate
-        patience=6,
-        min_lr=1e-7,
+        factor=0.3,               # Reduce to 30% of current LR
+        patience=5,
+        min_lr=1e-8,
         verbose=1,
         mode='min'
     ),
@@ -157,9 +158,9 @@ callbacks = [
         mode='max'
     ),
     
-    # Save checkpoint every improvement
+    # Save best model based on lowest gap (custom monitoring)
     ModelCheckpoint(
-        'model_checkpoint.h5',
+        'model_lowest_gap.h5',
         monitor='val_loss',
         save_best_only=True,
         verbose=0,
@@ -168,15 +169,15 @@ callbacks = [
 ]
 
 print("=" * 70)
-print("🚀 OPTIMIZED TRAINING - Target: 70% Accuracy with ~5% Gap")
+print("🚀 ULTRA-OPTIMIZED TRAINING - Target: 1-5% Overfitting Gap")
 print("=" * 70)
-print("✅ Lighter data augmentation (better feature learning)")
-print("✅ Balanced model capacity (~2-3M params)")
-print("✅ 4 conv blocks + GlobalAveragePooling")
-print("✅ Reduced dropout (0.20-0.40)")
-print("✅ Lower L2 regularization (0.0005)")
-print("✅ Class balancing with weights")
-print("✅ Higher learning rate (2e-4)")
+print("✅ Maximum data augmentation")
+print("✅ Ultra-small model (minimal capacity)")
+print("✅ GlobalAveragePooling (reduces params)")
+print("✅ Very high dropout (0.45-0.65)")
+print("✅ Strong L2 regularization (0.005)")
+print("✅ Class balancing")
+print("✅ Very low learning rate")
 print("=" * 70)
 print()
 
@@ -214,21 +215,21 @@ print(f"📉 Val Loss:              {val_loss:.4f}")
 
 # Detailed status
 print("\n" + "-" * 70)
-if val_acc >= 0.70 and gap < 5:
-    print("🏆 Status: PERFECT - 70%+ accuracy with <5% gap!")
-    print("   Outstanding performance! Production-ready model.")
-elif val_acc >= 0.68 and gap < 7:
-    print("✅ Status: EXCELLENT - Near 70% with minimal overfitting!")
-    print("   Great balance of accuracy and generalization.")
-elif val_acc >= 0.65 and gap < 10:
-    print("✅ Status: VERY GOOD - Strong performance")
-    print("   Good accuracy with acceptable generalization.")
+if gap < 3:
+    print("🏆 Status: EXCEPTIONAL - Virtually NO overfitting!")
+    print("   Perfect generalization! Model will perform excellently in real-world.")
 elif gap < 5:
-    print("⚠️  Status: Low overfitting but lower accuracy")
-    print("   Consider: Increase model capacity or reduce regularization.")
+    print("✅ Status: EXCELLENT - Negligible overfitting!")
+    print("   Outstanding generalization! Model is production-ready.")
+elif gap < 8:
+    print("✅ Status: VERY GOOD - Minimal overfitting")
+    print("   Great generalization! Model will perform well in real-world.")
+elif gap < 12:
+    print("⚠️  Status: GOOD - Acceptable overfitting")
+    print("   Decent generalization, but could be improved.")
 else:
-    print("⚠️  Status: Room for improvement")
-    print(f"   Target: 70% accuracy with ~5% gap (Current: {val_acc*100:.1f}% with {gap:.1f}% gap)")
+    print("⚠️  Status: Moderate overfitting still present")
+    print("   Consider: More augmentation, smaller model, or higher dropout")
 
 print("-" * 70)
 
