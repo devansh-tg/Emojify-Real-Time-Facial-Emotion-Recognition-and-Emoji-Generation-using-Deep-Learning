@@ -10,7 +10,7 @@ echo.
 cd /d "%~dp0"
 
 echo [1/3] Activating virtual environment...
-call "C:\emojify project\emojify (copy)\.venv\Scripts\activate.bat"
+call "C:\emojify project\EmoteVision\.venv\Scripts\activate.bat"
 
 echo [2/3] Installing Flask dependencies...
 pip install flask werkzeug --quiet

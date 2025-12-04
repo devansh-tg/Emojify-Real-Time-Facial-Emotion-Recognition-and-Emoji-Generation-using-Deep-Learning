@@ -148,7 +148,7 @@ def get_stats():
         'total_predictions': total_predictions,
         'avg_latency': sum(prediction_times) / len(prediction_times) if prediction_times else 0,
         'uptime': int(time.time() - session_start),
-        'model_accuracy': 63.35,
+        'model_accuracy': 70.01,
         'emotions_count': len(labels),
         'recent_emotions': [labels[i] for i in list(emotion_history)[-20:]]
     })
