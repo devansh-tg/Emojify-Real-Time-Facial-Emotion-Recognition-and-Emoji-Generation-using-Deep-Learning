@@ -101,7 +101,7 @@ def animate_header():
     pulse_val = int(200 + abs(math.sin(anim["pulse"])) * 55)
     pulse_color = f'#00ff{pulse_val:02x}'
     header.create_text(960, 65,
-                      text="⚡ Deep Learning | Real-Time Metrics | High Performance | 63% Accuracy ⚡",
+                      text="⚡ Deep Learning | Real-Time Metrics | High Performance | 70.01% Accuracy ⚡",
                       font=('Arial', 12, 'bold'),
                       fill=pulse_color)
     
